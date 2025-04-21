@@ -1,11 +1,22 @@
 package com.bezkoder.springjwt.payload.request;
+import jakarta.validation.constraints.NotNull;
+
 import java.util.List;
 
 public class UserSummary {
+
+    @NotNull
     private Long id;
+
+    @NotNull
     private String username;
+
+    @NotNull
     private String email;
+
+    @NotNull
     private List<String> roles;
+
 
     public UserSummary(Long id, String username, String email, List<String> roles) {
         this.id = id;

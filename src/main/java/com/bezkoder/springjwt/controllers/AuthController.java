@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import com.bezkoder.springjwt.payload.request.RoleFilterRequest;
 import com.bezkoder.springjwt.payload.request.UserSummary;
+import com.bezkoder.springjwt.security.services.UpdateService;
 import com.bezkoder.springjwt.security.services.UserService;
 import jakarta.validation.Valid;
 
@@ -48,6 +49,9 @@ public class AuthController {
 
   @Autowired
   UserService userService;
+
+  @Autowired
+  UpdateService updateService;
 
   @Autowired
   PasswordEncoder encoder;
@@ -137,6 +141,14 @@ public class AuthController {
   {
     List<UserSummary> users = userService.getUsersByRoles(roleFilterRequest.getRoles());
     return ResponseEntity.ok(users);
+  }
+
+  @PatchMapping("/updateRoles")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<?> updateRole(@Valid @RequestBody UserSummary userSummary)
+  {
+    Boolean value = updateService.updateRole(userSummary);
+    return ResponseEntity.ok(new MessageResponse("User role updated successfully!"));
   }
 }
 
