@@ -7,11 +7,14 @@ import com.bezkoder.springjwt.payload.request.UserSummary;
 import com.bezkoder.springjwt.repository.RoleRepository;
 import com.bezkoder.springjwt.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UpdateServiceImpl implements UpdateService {
@@ -22,43 +25,41 @@ public class UpdateServiceImpl implements UpdateService {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    AuditLogService auditLogService;
+
     @Override
     public Boolean updateRole(UserSummary userSummary) {
-        Optional<User> optionalUser = userRepository.findByUsername(userSummary.getUsername());
+        Optional<User> optionalUser = userRepository.findById(userSummary.getId());
 
-        if (!optionalUser.isPresent()) {
-            throw new RuntimeException("Error: User not found");
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            Set<Role> newRoles = userSummary.getRoles().stream()
+                    .map(roleName -> {
+                        ERole roleEnum = ERole.valueOf(roleName);
+                        return roleRepository.findByName(roleEnum)
+                                .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
+                    })
+                    .collect(Collectors.toSet());
+
+            user.setRoles(newRoles);
+            userRepository.save(user);
+
+            // 🔽 INSERT THIS BLOCK AFTER SAVING USER
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String performedBy = authentication.getName();
+
+            auditLogService.logAction(
+                    "UPDATE_ROLE",
+                    performedBy,
+                    user.getId(),
+                    "Updated roles to: " + userSummary.getRoles().toString()
+            );
+
+            return true;
         }
 
-        User user = optionalUser.get();
-        Set<Role> newRoles = new HashSet<>();
-
-        for (String roleStr : userSummary.getRoles()) {
-            ERole roleEnum;
-            switch (roleStr.toLowerCase()) {
-                case "admin":
-                    roleEnum = ERole.ROLE_ADMIN;
-                    break;
-                case "mod":
-                case "moderator":
-                    roleEnum = ERole.ROLE_MODERATOR;
-                    break;
-                case "user":
-                    roleEnum = ERole.ROLE_USER;
-                    break;
-                default:
-                    throw new RuntimeException("Error: Role '" + roleStr + "' is invalid.");
-            }
-
-            Role role = roleRepository.findByName(roleEnum)
-                    .orElseThrow(() -> new RuntimeException("Error: Role '" + roleEnum + "' not found in DB."));
-
-            newRoles.add(role);
-        }
-
-        user.setRoles(newRoles);
-        userRepository.save(user);
-
-        return true;
+        return false;
     }
 }
